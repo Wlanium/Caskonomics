@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2.5D Desk Scene Prototype</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: #0f1424;
+      color: #e8efff;
+    }
+
+    #viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(1200px 700px at 50% 15%, rgba(72, 92, 160, 0.32), transparent 65%),
+        linear-gradient(180deg, #171f37 0%, #0f1424 70%, #0a1020 100%);
+    }
+
+    .scene {
+      position: absolute;
+      width: 1600px;
+      height: 900px;
+      transform-origin: top left;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, #1b2543 0%, #172038 35%, #131a2f 60%, #10172a 100%);
+    }
+
+    .layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .layer.bg { z-index: 10; }
+    .layer.desk { z-index: 20; }
+    .layer.items { z-index: 30; pointer-events: auto; }
+    .layer.occlusion { z-index: 40; }
+    .layer.ui { z-index: 50; }
+
+    .wall-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 95% at 50% 10%, transparent 30%, rgba(8, 12, 22, 0.5) 100%);
+    }
+
+    .room-back-wall {
+      position: absolute;
+      left: 4%;
+      top: 4%;
+      width: 92%;
+      height: 52%;
+      border-radius: 14px 14px 0 0;
+      background: linear-gradient(180deg, #4c628b 0%, #3b4f74 58%, #314467 100%);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), inset 0 -40px 80px rgba(0,0,0,0.2);
+    }
+
+    .floor-plane {
+      position: absolute;
+      left: 4%;
+      top: 56%;
+      width: 92%;
+      height: 40%;
+      background:
+        linear-gradient(180deg, #3a2b22 0%, #2e211a 60%, #241912 100%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 4px, rgba(0,0,0,0.04) 4px 8px);
+      clip-path: polygon(3% 0, 97% 0, 100% 100%, 0 100%);
+      border-radius: 0 0 12px 12px;
+      opacity: 0.95;
+    }
+
+    .wall-seam {
+      position: absolute;
+      left: 4%;
+      top: 55.5%;
+      width: 92%;
+      height: 1.5%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(0,0,0,0.35));
+      opacity: 0.85;
+    }
+
+    .baseboard {
+      position: absolute;
+      left: 4%;
+      top: 55%;
+      width: 92%;
+      height: 2.2%;
+      background: linear-gradient(180deg, #d7dde8 0%, #b0b9c8 50%, #7f8aa1 100%);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+      opacity: 0.92;
+    }
+
+    .room-side-left,
+    .room-side-right {
+      position: absolute;
+      top: 4%;
+      width: 4%;
+      height: 52%;
+      background: linear-gradient(180deg, #43567b 0%, #37496d 100%);
+      opacity: 0.8;
+    }
+
+    .room-side-left { left: 0; }
+    .room-side-right { right: 0; }
+
+    .window {
+      position: absolute;
+      left: 11%;
+      top: 12%;
+      width: 24%;
+      height: 28%;
+      border-radius: 10px;
+      border: 3px solid #1b2a47;
+      background:
+        linear-gradient(180deg, rgba(165, 204, 255, 0.9), rgba(105, 154, 230, 0.72)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0 2px, transparent 2px 24px);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2), 0 10px 20px rgba(0,0,0,0.22);
+    }
+
+    .window::before,
+    .window::after {
+      content: "";
+      position: absolute;
+      background: rgba(15, 31, 63, 0.7);
+    }
+
+    .window::before {
+      left: calc(50% - 2px);
+      top: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .window::after {
+      top: calc(50% - 2px);
+      left: 0;
+      width: 100%;
+      height: 4px;
+    }
+
+    .door {
+      position: absolute;
+      right: 8.5%;
+      top: 15.5%;
+      width: 15.5%;
+      height: 40.5%;
+      border-radius: 8px 8px 0 0;
+      border: 3px solid #2c1f1a;
+      background: linear-gradient(90deg, #70503c 0%, #8a644d 45%, #6f4f3a 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), 0 10px 20px rgba(0,0,0,0.28);
+    }
+
+    .door-frame {
+      position: absolute;
+      right: 8.1%;
+      top: 14.8%;
+      width: 16.3%;
+      height: 41.5%;
+      border: 4px solid #d4dbe9;
+      border-bottom: 0;
+      border-radius: 10px 10px 0 0;
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    .door::before {
+      content: "";
+      position: absolute;
+      right: 14px;
+      top: 52%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ccb07a;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
+    }
+
+    .cabinet {
+      position: absolute;
+      left: 41%;
+      top: 16%;
+      width: 22%;
+      height: 40%;
+      border-radius: 6px;
+      border: 3px solid #1f2c49;
+      background: linear-gradient(180deg, #52678d 0%, #3e5276 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15), 0 12px 24px rgba(0,0,0,0.3);
+      padding: 10px;
+    }
+
+    .cabinet-shelf {
+      height: 31%;
+      border: 2px solid rgba(13, 27, 52, 0.7);
+      border-radius: 4px;
+      margin-bottom: 8px;
+      background: linear-gradient(180deg, rgba(20, 33, 58, 0.4), rgba(9, 18, 35, 0.45));
+      display: flex;
+      gap: 6px;
+      align-items: flex-end;
+      padding: 6px;
+    }
+
+    .cabinet-shelf:last-child {
+      margin-bottom: 0;
+    }
+
+    .binder {
+      width: 16%;
+      height: 85%;
+      border-radius: 2px 2px 0 0;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+    }
+
+    .binder.b1 { background: #9f4f50; }
+    .binder.b2 { background: #4d7aa9; height: 78%; }
+    .binder.b3 { background: #809c4d; height: 92%; }
+    .binder.b4 { background: #c1884a; height: 72%; }
+    .binder.b5 { background: #815ea7; height: 88%; }
+
+    .clock {
+      position: absolute;
+      right: 34%;
+      top: 8.5%;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      border: 5px solid #f0f4ff;
+      background: radial-gradient(circle at 30% 25%, #ffffff 0%, #edf1fa 100%);
+      box-shadow: 0 7px 16px rgba(0,0,0,0.25);
+    }
+
+    .clock::before,
+    .clock::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: 0 0;
+      background: #23324f;
+      border-radius: 2px;
+    }
+
+    .clock::before {
+      width: 22px;
+      height: 3px;
+      transform: translate(-1px, -1px) rotate(35deg);
+    }
+
+    .clock::after {
+      width: 3px;
+      height: 24px;
+      transform: translate(-1px, -1px) rotate(165deg);
+    }
+
+    .desk-surface {
+      position: absolute;
+      inset: 0;
+      clip-path: polygon(15% 43%, 85% 41%, 95% 86%, 7% 88%);
+      background:
+        linear-gradient(180deg, rgba(110, 84, 63, 0.9), rgba(93, 68, 49, 0.9)),
+        repeating-linear-gradient(15deg, rgba(255,255,255,0.05) 0 2px, rgba(0,0,0,0.04) 2px 4px);
+      box-shadow:
+        inset 0 2px 2px rgba(255,255,255,0.2),
+        inset 0 -10px 30px rgba(0,0,0,0.35),
+        0 24px 40px rgba(0,0,0,0.35);
+    }
+
+    .desk-shadow {
+      position: absolute;
+      left: 6%;
+      width: 88%;
+      top: 84%;
+      height: 8%;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.42), transparent 70%);
+      filter: blur(4px);
+    }
+
+    .item {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      cursor: grab;
+      pointer-events: auto;
+      transition: box-shadow 120ms ease;
+    }
+
+    .item.dragging {
+      cursor: grabbing;
+      box-shadow: 0 18px 36px rgba(0,0,0,0.45);
+      transition: none;
+    }
+
+    .item.selected {
+      filter: drop-shadow(0 0 10px rgba(120,190,255,0.45));
+      outline: 2px solid rgba(150,210,255,0.8);
+      outline-offset: 4px;
+    }
+
+    .monitor {
+      width: 250px;
+      height: 165px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #3f4a6f, #28314f);
+      border: 3px solid #191f34;
+    }
+
+    .monitor::before {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border-radius: 7px;
+      background: linear-gradient(160deg, #86abff 0%, #3f5ea2 45%, #1f2f59 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+    }
+
+    .monitor::after {
+      content: "";
+      position: absolute;
+      width: 56px;
+      height: 14px;
+      left: 50%;
+      top: calc(100% + 10px);
+      transform: translateX(-50%);
+      border-radius: 7px;
+      background: #181f34;
+      box-shadow: 0 20px 0 7px #141a2c;
+    }
+
+    .notes {
+      width: 128px;
+      height: 116px;
+      border-radius: 5px;
+      border: 1px solid #a68f5a;
+      background:
+        repeating-linear-gradient(180deg, rgba(0,0,0,0.1) 0 1px, transparent 1px 18px),
+        linear-gradient(180deg, #f8e9b7 0%, #ecd99d 100%);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.24);
+    }
+
+    .notes::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 11px;
+      height: 2px;
+      background: rgba(139, 91, 42, 0.35);
+      box-shadow: 0 17px 0 rgba(139, 91, 42, 0.28), 0 34px 0 rgba(139, 91, 42, 0.28);
+    }
+
+    .pen {
+      width: 182px;
+      height: 20px;
+      border-radius: 11px;
+      border: 1px solid #1f2232;
+      background:
+        linear-gradient(90deg, #20283e 0%, #11192e 18%, #4f607c 52%, #1b2a43 100%);
+      box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+    }
+
+    .pen::after {
+      content: "";
+      position: absolute;
+      right: -18px;
+      top: 3px;
+      width: 0;
+      height: 0;
+      border-left: 20px solid #d0d7e5;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35));
+    }
+
+    .glass {
+      width: 88px;
+      height: 116px;
+      border-radius: 18px;
+      border: 2px solid rgba(197, 233, 255, 0.75);
+      background:
+        linear-gradient(180deg, rgba(200, 240, 255, 0.35), rgba(90, 160, 220, 0.2));
+      box-shadow: inset 0 0 18px rgba(205, 241, 255, 0.2), 0 8px 14px rgba(0,0,0,0.25);
+    }
+
+    .glass::before {
+      content: "";
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      bottom: 10px;
+      height: 38%;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(80, 160, 220, 0.45), rgba(50, 130, 200, 0.55));
+    }
+
+    .front-edge {
+      position: absolute;
+      left: 6%;
+      top: 82%;
+      width: 88%;
+      height: 10%;
+      border-radius: 0 0 18px 18px;
+      background: linear-gradient(180deg, #4a3526 0%, #2f2117 100%);
+      box-shadow:
+        inset 0 2px 0 rgba(255,255,255,0.12),
+        0 12px 20px rgba(0,0,0,0.35);
+      pointer-events: none;
+    }
+
+    .debug-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+      background-size: 80px 80px;
+      pointer-events: none;
+      display: none;
+    }
+
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 300px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(12, 16, 28, 0.78);
+      backdrop-filter: blur(2px);
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-line;
+    }
+
+    .controls {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .btn {
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(12, 16, 28, 0.78);
+      color: #e8efff;
+      padding: 8px 11px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn:hover { background: rgba(30, 39, 64, 0.92); }
+
+    .help {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.24);
+      background: rgba(8, 13, 24, 0.8);
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    .item-tooltip {
+      position: absolute;
+      left: 50%;
+      top: -26px;
+      transform: translateX(-50%);
+      padding: 4px 7px;
+      border-radius: 6px;
+      background: rgba(10, 14, 25, 0.85);
+      border: 1px solid rgba(255,255,255,0.25);
+      font-size: 12px;
+      color: #d8e8ff;
+      white-space: nowrap;
+      pointer-events: none;
+      display: none;
+    }
+
+    .item.dragging .item-tooltip {
+      display: block;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <div class="scene" id="scene" aria-label="2.5D Desk Artboard">
+      <div class="layer bg">
+        <div class="room-side-left"></div>
+        <div class="room-side-right"></div>
+        <div class="room-back-wall"></div>
+        <div class="window" aria-hidden="true"></div>
+        <div class="door-frame" aria-hidden="true"></div>
+        <div class="door" aria-hidden="true"></div>
+        <div class="cabinet" aria-hidden="true">
+          <div class="cabinet-shelf">
+            <span class="binder b1"></span><span class="binder b2"></span><span class="binder b3"></span><span class="binder b4"></span><span class="binder b5"></span>
+          </div>
+          <div class="cabinet-shelf">
+            <span class="binder b2"></span><span class="binder b5"></span><span class="binder b4"></span><span class="binder b3"></span><span class="binder b1"></span>
+          </div>
+          <div class="cabinet-shelf">
+            <span class="binder b3"></span><span class="binder b4"></span><span class="binder b1"></span><span class="binder b2"></span><span class="binder b5"></span>
+          </div>
+        </div>
+        <div class="clock" aria-hidden="true"></div>
+        <div class="baseboard"></div>
+        <div class="floor-plane"></div>
+        <div class="wall-seam"></div>
+        <div class="wall-vignette"></div>
+      </div>
+
+      <div class="layer desk">
+        <div class="desk-surface"></div>
+        <div class="desk-shadow"></div>
+      </div>
+
+      <div class="layer items" id="itemsLayer"></div>
+
+      <div class="layer occlusion">
+        <div class="front-edge"></div>
+      </div>
+
+      <div class="layer ui">
+        <div class="grid-overlay" id="gridOverlay"></div>
+        <svg class="debug-overlay" id="debugOverlay" viewBox="0 0 1600 900" preserveAspectRatio="none"></svg>
+        <div class="hud" id="hud"></div>
+        <div class="controls">
+          <button class="btn" id="btnDebug" type="button">Debug (D)</button>
+          <button class="btn" id="btnGrid" type="button">Grid (G)</button>
+          <button class="btn" id="btnReset" type="button">Reset Layout</button>
+        </div>
+        <div class="help" id="help">Ziehen: Objekt mit Maus anfassen und bewegen · D/G für Debug/Grid · Reset stellt Demo-Layout wieder her.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Konfiguration ----------
+    const CONFIG = {
+      designWidth: 1600,
+      designHeight: 900,
+      deskQuad: {
+        // Uhrzeigersinn: p00 oben-links, p10 oben-rechts, p11 unten-rechts, p01 unten-links
+        p00: { x: 250, y: 305 },
+        p10: { x: 1340, y: 292 },
+        p11: { x: 1492, y: 760 },
+        p01: { x: 132, y: 774 }
+      },
+      depthScale: {
+        near: 1.08,
+        far: 0.85
+      },
+      zIndexBase: 100,
+      inverseSolve: {
+        iterations: 10,
+        alpha: 0.00085,
+        eps: 0.5
+      }
+    };
+
+    // ---------- Utility ----------
+    const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
+
+    function lerp(a, b, t) {
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t
+      };
+    }
+
+    function bilinearPoint(u, v, quad) {
+      const top = lerp(quad.p00, quad.p10, u);
+      const bottom = lerp(quad.p01, quad.p11, u);
+      return lerp(top, bottom, v);
+    }
+
+    function dist2(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return dx * dx + dy * dy;
+    }
+
+    // ---------- Scene Scaling ----------
+    const viewportEl = document.getElementById("viewport");
+    const sceneEl = document.getElementById("scene");
+    const itemsLayer = document.getElementById("itemsLayer");
+    const debugOverlay = document.getElementById("debugOverlay");
+    const gridOverlay = document.getElementById("gridOverlay");
+    const hud = document.getElementById("hud");
+    const btnDebug = document.getElementById("btnDebug");
+    const btnGrid = document.getElementById("btnGrid");
+    const btnReset = document.getElementById("btnReset");
+    const help = document.getElementById("help");
+
+    let currentScale = 1;
+
+    function updateSceneScale() {
+      const vw = viewportEl.clientWidth;
+      const vh = viewportEl.clientHeight;
+      const s = Math.min(vw / CONFIG.designWidth, vh / CONFIG.designHeight);
+      currentScale = s;
+
+      const scaledW = CONFIG.designWidth * s;
+      const scaledH = CONFIG.designHeight * s;
+      const offsetX = (vw - scaledW) / 2;
+      const offsetY = (vh - scaledH) / 2;
+
+      sceneEl.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${s})`;
+    }
+
+    window.addEventListener("resize", updateSceneScale);
+    updateSceneScale();
+
+    // ---------- Desk Placement ----------
+    function placeOnDesk(el, u, v, opts = {}) {
+      const p = bilinearPoint(u, v, CONFIG.deskQuad);
+      const scale = CONFIG.depthScale.far + (CONFIG.depthScale.near - CONFIG.depthScale.far) * v;
+      const rot = opts.rotation ?? 0;
+      const z = CONFIG.zIndexBase + Math.round(v * 1000) + (opts.zBoost || 0);
+
+      el.style.left = `${p.x}px`;
+      el.style.top = `${p.y}px`;
+      el.style.zIndex = String(z);
+      el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)}) rotate(${rot}deg)`;
+
+      el.dataset.u = String(u);
+      el.dataset.v = String(v);
+
+      const tip = el.querySelector(".item-tooltip");
+      if (tip) {
+        tip.textContent = `u:${u.toFixed(3)}  v:${v.toFixed(3)}`;
+      }
+    }
+
+    // ---------- Demo Items ----------
+    const itemDefs = [
+      { id: "monitor", className: "monitor", u: 0.53, v: 0.28, rotation: -1 },
+      { id: "notes", className: "notes", u: 0.3, v: 0.56, rotation: -6 },
+      { id: "pen", className: "pen", u: 0.62, v: 0.68, rotation: 8 },
+      { id: "glass", className: "glass", u: 0.77, v: 0.49, rotation: 3 }
+    ];
+
+    const items = new Map();
+
+    for (const def of itemDefs) {
+      const el = document.createElement("div");
+      el.className = `item ${def.className}`;
+      el.dataset.id = def.id;
+
+      const tip = document.createElement("div");
+      tip.className = "item-tooltip";
+      el.appendChild(tip);
+
+      itemsLayer.appendChild(el);
+      items.set(def.id, { el, rotation: def.rotation, u: def.u, v: def.v });
+      placeOnDesk(el, def.u, def.v, { rotation: def.rotation });
+    }
+
+    // ---------- Debug UI ----------
+    const state = {
+      debug: true,
+      grid: false,
+      selectedId: null,
+      showHelp: true
+    };
+
+    
+    function selectItem(id) {
+      state.selectedId = id;
+      for (const [itemId, item] of items) {
+        item.el.classList.toggle("selected", itemId === id);
+      }
+    }
+
+    function toggleDebug() {
+      state.debug = !state.debug;
+      renderDebugOverlay();
+      updateHUD();
+    }
+
+    function toggleGrid() {
+      state.grid = !state.grid;
+      updateHUD();
+    }
+
+    function resetLayout() {
+      for (const def of itemDefs) {
+        const item = items.get(def.id);
+        if (!item) continue;
+        item.u = def.u;
+        item.v = def.v;
+        placeOnDesk(item.el, item.u, item.v, { rotation: item.rotation });
+      }
+      selectItem(null);
+      updateHUD();
+    }
+
+    function renderDebugOverlay() {
+      if (!state.debug) {
+        debugOverlay.innerHTML = "";
+        debugOverlay.classList.add("hidden");
+        return;
+      }
+
+      const { p00, p10, p11, p01 } = CONFIG.deskQuad;
+      debugOverlay.classList.remove("hidden");
+      debugOverlay.innerHTML = `
+        <polygon
+          points="${p00.x},${p00.y} ${p10.x},${p10.y} ${p11.x},${p11.y} ${p01.x},${p01.y}"
+          fill="rgba(68, 192, 255, 0.1)"
+          stroke="rgba(68, 192, 255, 0.88)"
+          stroke-width="3"
+          stroke-dasharray="10 8"
+        />
+      `;
+    }
+
+    function updateHUD() {
+      const selected = state.selectedId ? items.get(state.selectedId) : null;
+      const uvText = selected
+        ? `Selected: ${state.selectedId}\nu=${selected.u.toFixed(3)}  v=${selected.v.toFixed(3)}`
+        : "Selected: none";
+
+      hud.textContent = `Desk Sandbox\nDebug: ${state.debug ? "ON" : "OFF"} · Grid: ${state.grid ? "ON" : "OFF"}\n${uvText}`;
+      gridOverlay.style.display = state.grid ? "block" : "none";
+      btnDebug.style.borderColor = state.debug ? "rgba(110,200,255,0.9)" : "rgba(255,255,255,0.25)";
+      btnGrid.style.borderColor = state.grid ? "rgba(110,200,255,0.9)" : "rgba(255,255,255,0.25)";
+      help.style.display = state.showHelp ? "block" : "none";
+    }
+
+    document.addEventListener("keydown", (ev) => {
+      const key = ev.key.toLowerCase();
+      if (key === "d") {
+        toggleDebug();
+      } else if (key === "g") {
+        toggleGrid();
+      } else if (key === "h") {
+        state.showHelp = !state.showHelp;
+        updateHUD();
+      } else if (key === "escape") {
+        selectItem(null);
+        updateHUD();
+      }
+    });
+
+    btnDebug.addEventListener("click", toggleDebug);
+    btnGrid.addEventListener("click", toggleGrid);
+    btnReset.addEventListener("click", resetLayout);
+
+    renderDebugOverlay();
+    updateHUD();
+
+    // ---------- Inverse Mapping (Mouse -> u/v) ----------
+    function solveUVFromPoint(target, startU, startV) {
+      let u = clamp(startU);
+      let v = clamp(startV);
+      const { iterations, alpha, eps } = CONFIG.inverseSolve;
+
+      // Iterative Näherung über finite differences + gradient step
+      for (let i = 0; i < iterations; i++) {
+        const p = bilinearPoint(u, v, CONFIG.deskQuad);
+        const err = { x: p.x - target.x, y: p.y - target.y };
+
+        if (Math.hypot(err.x, err.y) < eps) break;
+
+        const du = 0.001;
+        const dv = 0.001;
+        const pU = bilinearPoint(clamp(u + du), v, CONFIG.deskQuad);
+        const pV = bilinearPoint(u, clamp(v + dv), CONFIG.deskQuad);
+
+        const dPdu = { x: (pU.x - p.x) / du, y: (pU.y - p.y) / du };
+        const dPdv = { x: (pV.x - p.x) / dv, y: (pV.y - p.y) / dv };
+
+        // Gradienten der Fehlerfunktion ||P(u,v)-target||^2
+        const gradU = 2 * (err.x * dPdu.x + err.y * dPdu.y);
+        const gradV = 2 * (err.x * dPdv.x + err.y * dPdv.y);
+
+        u = clamp(u - alpha * gradU);
+        v = clamp(v - alpha * gradV);
+      }
+
+      return { u, v, p: bilinearPoint(u, v, CONFIG.deskQuad) };
+    }
+
+    // ---------- Drag & Drop ----------
+    const drag = {
+      active: false,
+      itemId: null,
+      offset: { x: 0, y: 0 },
+      u: 0,
+      v: 0
+    };
+
+    function clientToScene(clientX, clientY) {
+      const rect = sceneEl.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left) / currentScale,
+        y: (clientY - rect.top) / currentScale
+      };
+    }
+
+    itemsLayer.addEventListener("pointerdown", (ev) => {
+      const target = ev.target.closest(".item");
+      if (!target) return;
+
+      ev.preventDefault();
+
+      const id = target.dataset.id;
+      const item = items.get(id);
+      if (!item) return;
+
+      const mouseScene = clientToScene(ev.clientX, ev.clientY);
+      const itemPos = bilinearPoint(item.u, item.v, CONFIG.deskQuad);
+
+      drag.active = true;
+      drag.itemId = id;
+      drag.u = item.u;
+      drag.v = item.v;
+      drag.offset.x = mouseScene.x - itemPos.x;
+      drag.offset.y = mouseScene.y - itemPos.y;
+
+      selectItem(id);
+      state.showHelp = false;
+      itemsLayer.setPointerCapture?.(ev.pointerId);
+      target.classList.add("dragging");
+      target.style.zIndex = "9999";
+      updateHUD();
+    });
+
+    window.addEventListener("pointermove", (ev) => {
+      if (!drag.active || !drag.itemId) return;
+
+      const item = items.get(drag.itemId);
+      if (!item) return;
+
+      const mouseScene = clientToScene(ev.clientX, ev.clientY);
+      const targetPoint = {
+        x: mouseScene.x - drag.offset.x,
+        y: mouseScene.y - drag.offset.y
+      };
+
+      const solved = solveUVFromPoint(targetPoint, drag.u, drag.v);
+      drag.u = solved.u;
+      drag.v = solved.v;
+      item.u = solved.u;
+      item.v = solved.v;
+
+      placeOnDesk(item.el, item.u, item.v, { rotation: item.rotation, zBoost: 4000 });
+      updateHUD();
+    });
+
+    window.addEventListener("pointerup", () => {
+      if (!drag.active || !drag.itemId) return;
+
+      const item = items.get(drag.itemId);
+      if (item) {
+        item.el.classList.remove("dragging");
+        placeOnDesk(item.el, item.u, item.v, { rotation: item.rotation });
+      }
+
+      drag.active = false;
+      drag.itemId = null;
+    });
+
+    // Optional: Prevent browser drag image for smoother UX.
+    window.addEventListener("dragstart", (ev) => ev.preventDefault());
+
+    // Optional debug click check.
+    debugOverlay.addEventListener("click", (ev) => {
+      if (!state.debug) return;
+      const mouseScene = clientToScene(ev.clientX, ev.clientY);
+      const best = { id: null, d2: Number.POSITIVE_INFINITY };
+      for (const [id, item] of items) {
+        const p = bilinearPoint(item.u, item.v, CONFIG.deskQuad);
+        const d2 = dist2(mouseScene, p);
+        if (d2 < best.d2) {
+          best.id = id;
+          best.d2 = d2;
+        }
+      }
+      selectItem(best.id);
+      updateHUD();
+    });
+  </script>
+</body>
+</html>
